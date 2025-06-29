@@ -154,7 +154,7 @@ class AgentQueryRequest(BaseModel):
 # ✅ FastAPI 라우터
 @app.post("/agent/query")
 def query_agent(request: AgentQueryRequest = Body(...)):
-    result = run_customer_agent_with_rag(request.question, use_retriever=True, persona="e-commerce")
+    result = run_customer_agent_with_rag(request.question, use_retriever=True, persona=persona)
     return result
 
 
