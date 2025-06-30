@@ -45,10 +45,9 @@
             background-color: #f8f9fa;
             border-left: 4px solid #007bff;
             border-radius: 4px;
-            white-space: pre-wrap;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
             font-size: 14px;
         }
@@ -62,6 +61,8 @@
             border-left-color: #dc3545;
         }
     </style>
+    <!-- Markdown 파서 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -109,9 +110,9 @@
 
                 const data = await response.json();
                 
-                // answer만 표시
+                // Markdown → HTML 변환 후 출력
                 responseDiv.className = 'response';
-                responseDiv.textContent = data.answer || '답변을 찾을 수 없습니다.';
+                responseDiv.innerHTML = marked.parse(data.answer || '답변을 찾을 수 없습니다.');
                 
             } catch (error) {
                 responseDiv.className = 'response error';
@@ -119,7 +120,7 @@
             }
         }
 
-        // Enter 키로도 실행 가능
+        // Ctrl + Enter로도 실행 가능
         document.getElementById('question').addEventListener('keydown', function(event) {
             if (event.ctrlKey && event.key === 'Enter') {
                 sendRequest();

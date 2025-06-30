@@ -31,8 +31,11 @@ def load_prompt_text(file_path: str) -> str:
 TOPIC_CLASSIFY_SYSTEM_PROMPT = """
 너는 고객 질문을 분석해서 관련된 고객관리 토픽을 모두 골라주는 역할이야.
 
-아래의 토픽 중에서 질문과 관련된 키워드를 **복수 개까지** 골라줘.
+아래의 토픽 중에서 질문과 관련된 키워드를 **최소 1개부터 복수 개까지** 골라줘.
 콤마(,)로 구분된 키만 출력하고, 설명은 하지마.
+
+- 단일 토픽일 경우: 그냥 키만 출력 (예: customer_service)
+- 다중 토픽일 경우: 콤마(,)로 구분된 키 출력 (예: customer_service, customer_feedback)
 
 가능한 토픽:
 - customer_service
@@ -43,8 +46,6 @@ TOPIC_CLASSIFY_SYSTEM_PROMPT = """
 - community_building
 - customer_data
 - privacy_compliance
-
-출력 예시: customer_service, customer_feedback
 """
 
 def classify_topics(user_input: str) -> list:
@@ -59,6 +60,7 @@ def classify_topics(user_input: str) -> list:
 # ✅ 에이전트 프롬프트 구성 함수 (여러 프롬프트 병합)
 def build_agent_prompt(topics: list, user_input: str, persona: str):
     merged_prompts = []
+    print(f"선택된 토픽: {topics}")
     for topic in topics:
         file_path = PROMPT_META[topic]["file"]
         prompt_text = load_prompt_text(file_path)
@@ -67,9 +69,11 @@ def build_agent_prompt(topics: list, user_input: str, persona: str):
     role_descriptions = [PROMPT_META[topic]["role"] for topic in topics]
     
     if persona == "common":
-        system_template = f"""#역할\n너는 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}. 목표와 출력포맷에 맞게 응답해줘."""
+        system_template = f"""#역할\n너는 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}야. 목표와 출력포맷에 맞게 응답해줘."""
     else:
-        system_template = f"""#역할\n너는 {persona} 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}. 목표와 출력포맷에 맞게 응답해줘."""
+        system_template = f"""#역할\n너는 {persona} 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}야. 목표,출력포맷,응답방식에 맞게 응답해줘."""
+
+    system_template += "제공된 문서가 질문과 전혀 관련 없는 내용일 경우, 문서를 무시하고 너의 일반적인 지식을 기반으로 답변해줘."
 
     human_template = f"""
     {chr(10).join(merged_prompts)}
@@ -93,22 +97,34 @@ def run_customer_agent_with_rag(user_input: str, use_retriever: bool = True, per
     prompt = build_agent_prompt(topics, user_input, persona)
 
     # ✅ topic + category 기반 필터링 수정
+    # if topics:
+    #     topic_filter = {
+    #         "$and": [
+    #             {"category": "customer_management"},
+    #             {"topic": {"$in": topics}}
+    #         ]
+    #     }
+    # else:
+    #     topic_filter = {}
+
+    # topic 없을 때도 category 필터는 항상 유지
+    base_filter = {"category": "customer_management"}
     if topics:
         topic_filter = {
             "$and": [
-                {"category": "customer_management"},
+                base_filter,
                 {"topic": {"$in": topics}}
             ]
         }
     else:
-        topic_filter = {}
+        topic_filter = base_filter
 
     topic_retriever = vectorstore.as_retriever(
         search_kwargs={"k": 5, "filter": topic_filter}
     )
 
-    result = topic_retriever.get_relevant_documents(user_input)
-
+    # result = topic_retriever.get_relevant_documents(user_input)
+    result = topic_retriever.invoke(user_input)
     # 여러 chunk의 'content'를 합쳐서 하나의 'context'로 설정
     context = "\n\n".join([doc.page_content for doc in result])
 
@@ -129,7 +145,7 @@ def run_customer_agent_with_rag(user_input: str, use_retriever: bool = True, per
             "source": doc.metadata.get("source", "❌ 없음"),
             "metadata": doc.metadata,
             "length": len(doc.page_content),
-            "snippet": doc.page_content[:300]  # 문서의 첫 300자만 preview
+            "snippet": doc.page_content # [:300]  # 문서의 첫 300자만 preview
         }
         for doc in result.get('source_documents', [])
     ]
@@ -155,6 +171,7 @@ class AgentQueryRequest(BaseModel):
 @app.post("/agent/query")
 def query_agent(request: AgentQueryRequest = Body(...)):
     result = run_customer_agent_with_rag(request.question, use_retriever=True, persona=persona)
+    print(result)
     return result
 
 

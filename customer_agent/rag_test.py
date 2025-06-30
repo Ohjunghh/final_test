@@ -46,7 +46,7 @@ qa_chain = RetrievalQA.from_chain_type(
 print("✅ RetrievalQA 체인 생성 완료")
 
 # ✅ 질의 실행
-query = "온라인 쇼핑몰 운영중인데 악성리뷰 달렸어 어떻게해?"
+query = "hellolksdjaf;l jsl fㅇ니ㅏㅣㅇㄴㅁ라ㅣㅓ ;ㅓ나ㅣㅇㄻ"
 print(f"📨 질의: {query}")
 result = qa_chain.invoke(query)
 print("✅ QA 체인 실행 완료")

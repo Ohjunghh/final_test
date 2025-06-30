@@ -6,12 +6,12 @@ from langchain_chroma import Chroma
 # ✅ 환경변수 로드
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-CHROMA_DIR = os.getenv("CHROMA_DIR", "../vector_db_text-3-small_pdf")
+CHROMA_DIR = os.getenv("CHROMA_DIR", "../vector_db_text-3-small_merge")
 
 # ✅ 임베딩 모델 초기화
 embedding = OpenAIEmbeddings(
     model="text-embedding-3-small",
-    dimensions=384,
+    dimensions=1536,
     openai_api_key=OPENAI_API_KEY
 )
 
