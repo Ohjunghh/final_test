@@ -31,21 +31,18 @@ def load_prompt_text(file_path: str) -> str:
 TOPIC_CLASSIFY_SYSTEM_PROMPT = """
 너는 고객 질문을 분석해서 관련된 고객관리 토픽을 모두 골라주는 역할이야.
 
-아래의 토픽 중에서 질문과 관련된 키워드를 **최소 1개부터 복수 개까지** 골라줘.
-콤마(,)로 구분된 키만 출력하고, 설명은 하지마.
-
-- 단일 토픽일 경우: 그냥 키만 출력 (예: customer_service)
-- 다중 토픽일 경우: 콤마(,)로 구분된 키 출력 (예: customer_service, customer_feedback)
+아래의 토픽 중에서 질문과 관련된 키워드를 **가장 밀접한 키워드 1개만** 골라줘.
+키만 출력하고, 설명은 하지마. (예: customer_service)
 
 가능한 토픽:
-- customer_service
-- customer_retention
-- customer_satisfaction
-- customer_feedback
-- customer_segmentation
-- community_building
-- customer_data
-- privacy_compliance
+- customer_service – 응대, 클레임
+- customer_retention – 재방문, 단골 전략
+- customer_satisfaction – 만족도, 여정
+- customer_feedback – 의견 수집 및 개선
+- customer_segmentation – 타겟 분류, 페르소나
+- community_building – 팬덤, 커뮤니티
+- customer_data – 고객DB, CRM
+- privacy_compliance – 개인정보, 동의 관리
 """
 
 def classify_topics(user_input: str) -> list:

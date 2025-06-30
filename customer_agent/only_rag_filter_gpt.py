@@ -4,25 +4,22 @@ from langchain_core.output_parsers import StrOutputParser
 from config.env_config import llm, vectorstore
 from prompts_config import PROMPT_META
 
-# ✅ 토픽 분류 프롬프트
+# ✅ 관련 토픽 추론
 TOPIC_CLASSIFY_SYSTEM_PROMPT = """
 너는 고객 질문을 분석해서 관련된 고객관리 토픽을 모두 골라주는 역할이야.
 
-아래의 토픽 중에서 질문과 관련된 키워드를 **최소 1개부터 복수 개까지** 골라줘.
-콤마(,)로 구분된 키만 출력하고, 설명은 하지마.
-
-- 단일 토픽일 경우: 그냥 키만 출력 (예: customer_service)
-- 다중 토픽일 경우: 콤마(,)로 구분된 키 출력 (예: customer_service, customer_feedback)
+아래의 토픽 중에서 질문과 관련된 키워드를 **가장 밀접한 키워드 1개만** 골라줘.
+키만 출력하고, 설명은 하지마. (예: customer_service)
 
 가능한 토픽:
-- customer_service
-- customer_retention
-- customer_satisfaction
-- customer_feedback
-- customer_segmentation
-- community_building
-- customer_data
-- privacy_compliance
+- customer_service – 응대, 클레임
+- customer_retention – 재방문, 단골 전략
+- customer_satisfaction – 만족도, 여정
+- customer_feedback – 의견 수집 및 개선
+- customer_segmentation – 타겟 분류, 페르소나
+- community_building – 팬덤, 커뮤니티
+- customer_data – 고객DB, CRM
+- privacy_compliance – 개인정보, 동의 관리
 """
 def classify_topics(user_input: str) -> list:
     classify_prompt = ChatPromptTemplate.from_messages([
@@ -86,7 +83,7 @@ def run_topic_filtered_rag(user_input: str):
 
 # ✅ 직접 실행
 if __name__ == "__main__":
-    question = "최근 고객 리뷰에 ‘포장이 부실하다’는 말이 자주 보여. 이걸 어떻게 분석하고 개선하면 좋을까?"#"쇼핑몰 운영중인데 첫 구매만 하고 떠난 고객이 많아. 어떻게 다시 유도할 수 있을까?"#"배송이 너무 늦어서 별점1개가 달렸어. 어떻게 답변 달아야 할까?"
+    question = "첫 구매만 하고 재구매가 없는 고객이랑, 자주 구매하는 고객을 다르게 타겟팅하고 싶은데, 어떻게 나눠서 전략 짜면 좋을까?"#"최근 고객 리뷰에 ‘포장이 부실하다’는 말이 자주 보여. 이걸 어떻게 분석하고 개선하면 좋을까?"#"쇼핑몰 운영중인데 첫 구매만 하고 떠난 고객이 많아. 어떻게 다시 유도할 수 있을까?"#"배송이 너무 늦어서 별점1개가 달렸어. 어떻게 답변 달아야 할까?"
     result = run_topic_filtered_rag(question)
 
     print("▶ 관련 토픽:", result['topics'])
