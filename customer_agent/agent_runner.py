@@ -1,33 +1,171 @@
-from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain.chains import RetrievalQA
-from fastapi.middleware.cors import CORSMiddleware
-from prompts_config import PROMPT_META
-from fastapi import FastAPI, Body
-from pydantic import BaseModel
-from config.env_config import llm, retriever, embedding, vectorstore
+# from langchain_core.prompts import ChatPromptTemplate
+# from langchain_core.runnables import RunnablePassthrough
+# from langchain.chains.combine_documents import create_stuff_documents_chain
+# from langchain.chains.retrieval import create_retrieval_chain
+# from fastapi.middleware.cors import CORSMiddleware
+# from fastapi import FastAPI, Body
+# from pydantic import BaseModel
+# from langchain_core.output_parsers import StrOutputParser
+# import os
+# import sys
+# import logging
+
+# # 로거 설정
+# logger = logging.getLogger(__name__)
+
+# # 경로 설정: 현재 파일 위치 → 프로젝트 루트
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# project_root = os.path.dirname(current_dir)
+# if project_root not in sys.path:
+#     sys.path.append(project_root)
+    
+# # 절대경로로 임포트
+# from config.env_config import llm, vectorstore
+# from customer_agent.prompts_config import PROMPT_META
+
+# # 관련 토픽 추론
+# TOPIC_CLASSIFY_SYSTEM_PROMPT = """
+# 너는 고객 질문을 분석해서 관련된 고객관리 토픽을 모두 골라주는 역할이야.
+
+# 아래의 토픽 중에서 질문과 관련된 키워드를 **가장 밀접한 키워드 1개만** 골라줘.
+# 키만 출력하고, 설명은 하지마. (예: customer_service)
+
+# 가능한 토픽:
+# - customer_service – 응대, 클레임
+# - customer_retention – 재방문, 단골 전략
+# - customer_satisfaction – 만족도, 여정
+# - customer_feedback – 의견 수집 및 개선
+# - customer_segmentation – 타겟 분류, 페르소나
+# - community_building – 팬, 팬덤, 커뮤니티
+# - customer_data – 고객DB, CRM
+# - privacy_compliance – 개인정보, 동의 관리
+# """
+
+# def classify_topics(user_input: str) -> list:
+#     classify_prompt = ChatPromptTemplate.from_messages([
+#         ("system", TOPIC_CLASSIFY_SYSTEM_PROMPT),
+#         ("human", f"사용자 질문: {user_input}")
+#     ])
+#     chain = classify_prompt | llm | StrOutputParser()
+#     result = chain.invoke({"input": user_input}).strip()
+#     return [t.strip() for t in result.split(",") if t.strip() in PROMPT_META]
+
+# # 에이전트 프롬프트 구성 함수
+# def build_agent_prompt(topics: list, user_input: str, persona: str):
+#     merged_prompts = []
+#     for topic in topics:
+#         file_path = PROMPT_META[topic]["file"]
+#         prompt_text = load_prompt_text(file_path)
+#         merged_prompts.append(f"# {topic}\n{prompt_text}")
+    
+#     role_descriptions = [PROMPT_META[topic]["role"] for topic in topics]
+    
+#     if persona == "common":
+#         system_template = f"""#역할\n너는 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}야. 목표와 출력포맷에 맞게 응답해줘."""
+#     else:
+#         system_template = f"""#역할\n너는 {persona} 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}야. 목표와 출력포맷에 맞게 응답해줘."""
+
+#     system_template += "제공된 문서가 비어있거나, 질문과 전혀 관련 없는 내용일 경우, 문서를 무시하고 너의 일반적인 지식을 기반으로 답변해줘."
+
+#     human_template = f"""
+#     {chr(10).join(merged_prompts)}
+    
+#     #참고 문서
+#     {{context}}
+    
+#     #사용자 입력
+#     {user_input}
+#     """
+    
+#     return ChatPromptTemplate.from_messages([
+#         ("system", system_template),
+#         ("human", human_template)
+#     ])
+
+# def load_prompt_text(file_name: str) -> str:
+#     prompt_dir = os.path.join(os.path.dirname(__file__), "prompt")
+#     full_path = os.path.join(prompt_dir, file_name)
+#     try:
+#         with open(full_path, "r", encoding="utf-8") as f:
+#             return f.read().strip()
+#     except FileNotFoundError:
+#         logger.error(f"Prompt file not found: {full_path}")
+#         return ""
+
+# def run_customer_agent_with_rag(user_input: str, persona: str = "common"):
+#     # 1. 토픽 분류
+#     topics = classify_topics(user_input)
+    
+#     # 2. 프롬프트 구성
+#     prompt = build_agent_prompt(topics, user_input, persona)
+    
+#     # 3. 검색 필터 설정
+#     base_filter = {"category": "customer_management"}
+#     topic_filter = base_filter
+#     if topics:
+#         topic_filter = {"$and": [base_filter, {"topic": {"$in": topics}}]}
+    
+#     # 4. 검색기 구성 (공식 문서 방식)
+#     retriever = vectorstore.as_retriever(
+#         search_kwargs={"k": 5, "filter": topic_filter}
+#     )
+    
+#     # 5. 문서 처리 체인 구성 (공식 문서 방식)
+#     document_chain = create_stuff_documents_chain(
+#         llm=llm,
+#         prompt=prompt
+#     )
+    
+#     # 6. 검색 체인 구성
+#     retrieval_chain = create_retrieval_chain(
+#         retriever=retriever,
+#         combine_docs_chain=document_chain
+#     )
+    
+#     # 7. 실행 및 결과 처리
+#     result = retrieval_chain.invoke({"input": user_input})
+    
+#     # 8. 소스 문서 포맷팅
+#     sources = "\n\n".join(
+#         [f"# 문서\n{doc.page_content}\n" for doc in result["context"]]
+#     )
+    
+#     return {
+#         "topics": topics,
+#         "answer": result["answer"],
+#         "sources": sources
+#     }
+
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains.retrieval import create_retrieval_chain
 from langchain_core.output_parsers import StrOutputParser
 import os
+import sys
+import logging
+import pathlib  # 추가: 경로 처리를 위해 필요
 
-# ✅ FastAPI 초기화
-app = FastAPI()
+# 로거 설정
+logger = logging.getLogger(__name__)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 모든 도메인 허용 (개발용)
-    allow_credentials=True,
-    allow_methods=["*"],  # 모든 HTTP 메서드 허용
-    allow_headers=["*"],  # 모든 헤더 허용
-)
+# 경로 설정: 현재 파일 위치 → 프로젝트 루트
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
-# persona
-persona = "e-commerce"  # 나중에 db에서 가져오기??
+# 절대경로로 임포트
 
-# ✅ 프롬프트 파일 로드 함수
-def load_prompt_text(file_path: str) -> str:
-    with open(file_path, "r", encoding="utf-8") as f:
-        return f.read().strip()
+from config.env_config import llm, vectorstore
+from customer_agent.prompts_config import PROMPT_META
 
-# ✅ 관련 토픽 추론
+
+# 경로 처리를 위한 베이스 디렉토리 설정
+BASE_DIR = pathlib.Path(__file__).parent.resolve()  # 추가
+
+# 관련 토픽 추론
 TOPIC_CLASSIFY_SYSTEM_PROMPT = """
 너는 고객 질문을 분석해서 관련된 고객관리 토픽을 모두 골라주는 역할이야.
 
@@ -40,143 +178,113 @@ TOPIC_CLASSIFY_SYSTEM_PROMPT = """
 - customer_satisfaction – 만족도, 여정
 - customer_feedback – 의견 수집 및 개선
 - customer_segmentation – 타겟 분류, 페르소나
-- community_building – 팬덤, 커뮤니티
+- community_building – 팬, 팬덤, 커뮤니티
 - customer_data – 고객DB, CRM
 - privacy_compliance – 개인정보, 동의 관리
 """
 
 def classify_topics(user_input: str) -> list:
+    # 수정: 변수화된 템플릿 사용
     classify_prompt = ChatPromptTemplate.from_messages([
         ("system", TOPIC_CLASSIFY_SYSTEM_PROMPT),
-        ("human", f"사용자 질문: {user_input}")
+        ("human", "사용자 질문: {input}")  # 고정 문자열 → 변수
     ])
+    
     chain = classify_prompt | llm | StrOutputParser()
     result = chain.invoke({"input": user_input}).strip()
-    return [t.strip() for t in result.split(",") if t.strip() in PROMPT_META]
+    
+    # 수정: 단일 토픽 반환 (시스템 지침에 따라)
+    return [result.strip()] if result.strip() in PROMPT_META else []
 
-# ✅ 에이전트 프롬프트 구성 함수 (여러 프롬프트 병합)
-def build_agent_prompt(topics: list, user_input: str, persona: str):
+# 에이전트 프롬프트 구성 함수
+def build_agent_prompt(topics: list, persona: str):  # 수정: user_input 매개변수 제거
     merged_prompts = []
-    print(f"선택된 토픽: {topics}")
     for topic in topics:
-        file_path = PROMPT_META[topic]["file"]
-        prompt_text = load_prompt_text(file_path)
+        file_name = PROMPT_META[topic]["file"]  # 파일명만 사용
+        prompt_text = load_prompt_text(file_name)
         merged_prompts.append(f"# {topic}\n{prompt_text}")
-
+    
     role_descriptions = [PROMPT_META[topic]["role"] for topic in topics]
     
     if persona == "common":
         system_template = f"""#역할\n너는 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}야. 목표와 출력포맷에 맞게 응답해줘."""
     else:
-        system_template = f"""#역할\n너는 {persona} 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}야. 목표,출력포맷,응답방식에 맞게 응답해줘."""
+        system_template = f"""#역할\n너는 {persona} 1인 창업 전문 컨설턴트로서 {', '.join(role_descriptions)}야. 목표와 출력포맷에 맞게 응답해줘."""
 
-    system_template += "제공된 문서가 질문과 전혀 관련 없는 내용일 경우, 문서를 무시하고 너의 일반적인 지식을 기반으로 답변해줘."
+    system_template += " 제공된 문서가 비어있거나, 질문과 전혀 관련 없는 내용일 경우, 문서를 무시하고 너의 일반적인 지식을 기반으로 답변해줘."
 
+    # 수정: 동적 변수 사용 (input, context)
     human_template = f"""
     {chr(10).join(merged_prompts)}
-
+    
     #참고 문서
     {{context}}
-
+    
     #사용자 입력
-    {user_input}
+    {{input}}
     """
-
-    prompt = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template(system_template),
-        HumanMessagePromptTemplate.from_template(human_template)
+    
+    return ChatPromptTemplate.from_messages([
+        ("system", system_template),
+        ("human", human_template)
     ])
-    return prompt
 
+def load_prompt_text(file_name: str) -> str:
+    # 수정: pathlib를 사용한 강화된 경로 처리
+    prompt_dir = BASE_DIR / "prompt"
+    full_path = prompt_dir / file_name
+    
+    try:
+        # 수정: pathlib로 파일 읽기
+        return full_path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        logger.error(f"Prompt file not found: {full_path}")
+        return ""
+    except Exception as e:
+        logger.error(f"Error loading prompt: {str(e)}")
+        return ""
 
-def run_customer_agent_with_rag(user_input: str, use_retriever: bool = True, persona: str = "common"):
+def run_customer_agent_with_rag(user_input: str, persona: str = "common"):
+    # 1. 토픽 분류
     topics = classify_topics(user_input)
-    prompt = build_agent_prompt(topics, user_input, persona)
-
-    # ✅ topic + category 기반 필터링 수정
-    # if topics:
-    #     topic_filter = {
-    #         "$and": [
-    #             {"category": "customer_management"},
-    #             {"topic": {"$in": topics}}
-    #         ]
-    #     }
-    # else:
-    #     topic_filter = {}
-
-    # topic 없을 때도 category 필터는 항상 유지
+    logger.info(f"Classified topics: {topics}")
+    
+    # 2. 프롬프트 구성 (수정: user_input 제거)
+    prompt = build_agent_prompt(topics, persona)
+    
+    # 3. 검색 필터 설정
     base_filter = {"category": "customer_management"}
+    topic_filter = base_filter
     if topics:
-        topic_filter = {
-            "$and": [
-                base_filter,
-                {"topic": {"$in": topics}}
-            ]
-        }
-    else:
-        topic_filter = base_filter
-
-    topic_retriever = vectorstore.as_retriever(
+        topic_filter = {"$and": [base_filter, {"topic": {"$in": topics}}]}
+    
+    # 4. 검색기 구성
+    retriever = vectorstore.as_retriever(
         search_kwargs={"k": 5, "filter": topic_filter}
     )
-
-    # result = topic_retriever.get_relevant_documents(user_input)
-    result = topic_retriever.invoke(user_input)
-    # 여러 chunk의 'content'를 합쳐서 하나의 'context'로 설정
-    context = "\n\n".join([doc.page_content for doc in result])
-
-    # qa_chain에서 context 변수 설정
-    qa_chain = RetrievalQA.from_chain_type(
+    
+    # 5. 문서 처리 체인 구성
+    document_chain = create_stuff_documents_chain(
         llm=llm,
-        chain_type="stuff",
-        retriever=topic_retriever if use_retriever else None,
-        chain_type_kwargs={"prompt": prompt},  # input_variables 제거
-        return_source_documents=True
+        prompt=prompt
     )
-
-    result = qa_chain.invoke(user_input)
-
-    # 문서 내용 출력
-    sources = [
-        {
-            "source": doc.metadata.get("source", "❌ 없음"),
-            "metadata": doc.metadata,
-            "length": len(doc.page_content),
-            "snippet": doc.page_content # [:300]  # 문서의 첫 300자만 preview
-        }
-        for doc in result.get('source_documents', [])
-    ]
-
-    # 문서 내용 포맷팅하여 # 문서 형태로 출력
-    formatted_sources = "\n\n".join(
-        [f"# 문서\n{doc['snippet']}\n" for doc in sources]
+    
+    # 6. 검색 체인 구성
+    retrieval_chain = create_retrieval_chain(
+        retriever=retriever,
+        combine_docs_chain=document_chain
     )
-
+    
+    # 7. 실행 및 결과 처리 (수정: 변수명 통일)
+    result = retrieval_chain.invoke({"input": user_input})
+    
+    # 8. 소스 문서 포맷팅
+    sources = "\n\n".join(
+        [f"# 문서\n{doc.page_content}\n" for doc in result["context"]]
+    )
+    
     return {
         "topics": topics,
-        "answer": result['result'],
-        "sources": formatted_sources
+        "answer": result["answer"],
+        "sources": sources
     }
-
-
-# ✅ 요청 모델 정의
-class AgentQueryRequest(BaseModel):
-    question: str
-
-
-# ✅ FastAPI 라우터
-@app.post("/agent/query")
-def query_agent(request: AgentQueryRequest = Body(...)):
-    result = run_customer_agent_with_rag(request.question, use_retriever=True, persona=persona)
-    print(result)
-    return result
-
-
-
-# 배송이 너무 늦어서 별점1개가 달렸어. 어떻게 답변 달아야 할까?
-
-# uvicorn agent_runner:app --reload 
-
-# curl -X POST "http://127.0.0.1:8000/agent/query" ^
-# -H "Content-Type: application/json" ^
-# -d "{\"question\": \"고객과의 장기적인 관계 유지를 위해 어떤 전략을 추천해줄 수 있나요?\"}"
