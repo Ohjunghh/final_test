@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage,AIMessage
 from typing import Dict, Any
-
+from fastapi.responses import HTMLResponse
 # 로거 설정
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -22,7 +22,7 @@ project_root = os.path.dirname(current_dir)
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from MYSQL.queries import get_business_type, insert_message, get_messages_by_conversation
+from MYSQL.queries import get_business_type, insert_message, get_messages_by_conversation, get_template_by_id
 from customer_agent.graph import customer_workflow, CustomerAgentState  # LangGraph 임포트
 
 app = FastAPI()
@@ -128,6 +128,15 @@ async def query_agent(request: AgentQueryRequest = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/preview/{template_id}", response_class=HTMLResponse)
+def preview_template(template_id: int):
+    template = get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if template["content_type"] != "html":
+        raise HTTPException(status_code=400, detail="Not an HTML template")
+    return HTMLResponse(content=template["content"])
 
 if __name__ == "__main__":
     import uvicorn

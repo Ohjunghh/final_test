@@ -159,7 +159,24 @@ def get_templates_by_type(template_type: str) -> list:
     except Exception as e:
         return handle_db_error(e, "get_templates_by_type") or []
 
-
+def get_template_by_id(template_id: int) -> dict | None:
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    SELECT id, template_type, content_type, title, content
+                    FROM template_message
+                    WHERE id = :template_id
+                """),
+                {"template_id": template_id}
+            )
+            row = result.fetchone()
+            if row:
+                return dict(row._mapping)
+            return None
+    except Exception as e:
+        return handle_db_error(e, "get_template_by_id")
+    
 def update_template(template_id: int, **kwargs) -> bool:
     try:
         valid_keys = {"template_type", "channel_type", "title", "content"}

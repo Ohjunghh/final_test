@@ -19,7 +19,7 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 # 절대경로로 임포트
-from config.env_config import llm
+from config.env_config import llm,llm_gemini
 
 # 1. 분류 모델 정의 (Pydantic 대신 간소화)
 class InquiryClassification(BaseModel):
@@ -34,7 +34,7 @@ def analyze_inquiry_node(state: CustomerAgentState) -> dict:
     **반드시 다음 3개 유형 중 하나로 분류하세요:**
     - 인사: 순수 인사/감사 표현 (예: "안녕하세요", "감사합니다")
     - 상담: 사장님의 고객 관리 관련 문의  
-      (예: "단골 고객 유지 방법", "고객 불만 해결법", "리뷰 관리 전략")
+      (예: "단골 고객 유지 방법", "고객 불만 해결법", "리뷰 관리 전략","답변 템플릿/메세지 추천")
     - 잡담: 업무와 무관한 대화 (예: "오늘 날씨 좋네요")
     
     **출력 형식:**
@@ -79,7 +79,8 @@ def small_talk_node(state: CustomerAgentState) -> dict:
         prompt = ChatPromptTemplate.from_template(
             "사용자의 인사나 잡담에 1-2문장으로 정중한 어투로 답변하세요: {input}"
         )
-        chain = prompt | llm | StrOutputParser()
+        chain = prompt | llm_gemini | StrOutputParser()
+        #chain = prompt | llm | StrOutputParser()
         response = chain.invoke({"input": state["user_input"]})
 
     # 새 메시지 생성 (history에 append)

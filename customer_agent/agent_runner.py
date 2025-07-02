@@ -173,12 +173,34 @@ def run_customer_agent_with_rag(
     topics = classify_topics(user_input)
     logger.info(f"Classified topics: {topics}")
 
+    # if "customer_message" in topics:
+    #     template_type = extract_template_type(user_input)
+    #     logger.info(f"Extracted template_type: {template_type}")
+    #     templates = get_templates_by_type(template_type)
+    #     if templates:
+    #         answer = "\n\n\n".join([f"제목: {t['title']}\n\n{t['content']}" for t in templates])
+    #         answer += f"\n\n 위와 같은 메시지 템플릿을 활용해보세요."
+    #         sources = ""
+    #     else:
+    #         answer, sources = run_rag_chain(user_input, topics, persona, chat_history)
+    #     return {
+    #         "topics": topics,
+    #         "answer": answer,
+    #         "sources": sources
+    #     }
     if "customer_message" in topics:
         template_type = extract_template_type(user_input)
         logger.info(f"Extracted template_type: {template_type}")
         templates = get_templates_by_type(template_type)
         if templates:
-            answer = "\n\n\n".join([f"제목: {t['title']}\n\n{t['content']}" for t in templates])
+            answer_blocks = []
+            for t in templates:
+                if t.get("content_type") == "html":
+                    preview_url = f"/preview/{t['id']}"
+                    answer_blocks.append(f"제목: {t['title']}\n\n[HTML 미리보기]({preview_url})")
+                else:
+                    answer_blocks.append(f"제목: {t['title']}\n\n{t['content']}")
+            answer = "\n\n\n".join(answer_blocks)
             answer += f"\n\n 위와 같은 메시지 템플릿을 활용해보세요."
             sources = ""
         else:
