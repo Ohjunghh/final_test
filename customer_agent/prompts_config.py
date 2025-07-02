@@ -49,5 +49,15 @@ PROMPT_META = {
         "role": "개인정보 및 동의 관리 컨설턴트",
         "file": "privacy_compliance.txt",
         #"post_process": ["legal_checklist", "consent_flow_suggestion"],
-    }
+    },
+    "customer_message": {  
+        "name": "고객 메시지/템플릿",
+        "role": "고객에게 보낼 메시지, 문구, 알림, 템플릿을 추천·작성하는 에이전트",
+        "file": "customer_message.txt",
+    },
+    "customer_etc": {  
+        "name": "기타",
+        "role": "사장님을 위해 고객관리 주제에 대응하는 에이전트",
+        "file": "customer_etc.txt",
+    },
 }

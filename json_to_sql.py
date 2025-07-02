@@ -7,7 +7,7 @@ from MYSQL.connection import engine
 json_path = "new_crm_template.json" 
 
 # user_id는 실제 사용자 ID로 지정
-user_id = 1004
+user_id = 3
 
 # JSON 파일 읽기
 with open(json_path, "r", encoding="utf-8") as f:
@@ -27,7 +27,7 @@ with engine.begin() as conn:
                 "channel_type": template.get('channel_type'),
                 "title": template.get('title'),
                 "content": template.get('content'),
-                "created_at": datetime.utcnow()
+                "created_at": datetime.now()
             }
         )
 

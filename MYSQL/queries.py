@@ -144,6 +144,21 @@ def get_templates_by_user(user_id: int) -> list:
             return [dict(row._mapping) for row in result]
     except Exception as e:
         return handle_db_error(e, "get_templates_by_user") or []
+    
+def get_templates_by_type(template_type: str) -> list:
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    SELECT * FROM template_message 
+                    WHERE template_type = :template_type
+                """),
+                {"template_type": template_type}
+            )
+            return [dict(row._mapping) for row in result]
+    except Exception as e:
+        return handle_db_error(e, "get_templates_by_type") or []
+
 
 def update_template(template_id: int, **kwargs) -> bool:
     try:
@@ -175,7 +190,6 @@ def delete_template(template_id: int) -> bool:
         return handle_db_error(e, "delete_template") or False
 
 # message 테이블 연산 ----------------------------------------------
-
 def insert_message(
     conversation_id: int,
     sender_type: str,
@@ -186,6 +200,7 @@ def insert_message(
     message 테이블에 메시지 추가
     - conversation_id, sender_type, content: 필수
     - agent_type: 선택 (기본값 NULL)
+    - created_at: Python에서 현재 시간으로 직접 입력
     - 반환값: 성공 시 True, 실패 시 False
     """
     try:
@@ -193,17 +208,45 @@ def insert_message(
             conn.execute(
                 text("""
                 INSERT INTO message 
-                (conversation_id, sender_type, agent_type, content)
-                VALUES (:conversation_id, :sender_type, :agent_type, :content)
+                (conversation_id, sender_type, agent_type, content, created_at)
+                VALUES (:conversation_id, :sender_type, :agent_type, :content, :created_at)
                 """),
                 {
                     "conversation_id": conversation_id,
                     "sender_type": sender_type,
                     "agent_type": agent_type,
-                    "content": content
+                    "content": content,
+                    "created_at": datetime.now()  # 현재 시간 입력
                 }
             )
         return True
     except SQLAlchemyError as e:
         logger.error(f"Error inserting message: {e}")
         return False
+
+def get_messages_by_conversation(conversation_id: int, recent_turns: int = 5) -> list:
+    """
+    message 테이블에서 conversation_id와 agent_type='customer_agent'인 메시지 중
+    최신 N턴(2*recent_turns개)만 message_id 기준으로 내림차순 정렬 후 시간순(오래된→최신)으로 반환
+    """
+    limit_count = recent_turns * 2
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    SELECT *
+                    FROM message
+                    WHERE conversation_id = :conversation_id
+                    ORDER BY message_id DESC
+                    LIMIT :limit_count
+                """),
+                {
+                    "conversation_id": conversation_id,
+                    "limit_count": limit_count
+                }
+            )
+            messages = [dict(row._mapping) for row in result]
+            return list(reversed(messages))  # 오래된→최신 순서로 반환
+    except Exception as e:
+        logger.error(f"메시지 조회 오류: {str(e)}")
+        return []
