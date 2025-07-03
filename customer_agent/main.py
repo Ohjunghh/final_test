@@ -59,6 +59,7 @@ def load_initial_history(conversation_id: int, recent_turns: int = 5) -> list:
 async def health_check():
     return {"status": "ok", "agent": "customer_agent"}
 
+
 # main.py
 @app.post("/agent/query")
 async def query_agent(request: AgentQueryRequest = Body(...)):
@@ -127,6 +128,8 @@ async def query_agent(request: AgentQueryRequest = Body(...)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 @app.get("/preview/{template_id}", response_class=HTMLResponse)

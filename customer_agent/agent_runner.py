@@ -51,9 +51,9 @@ TOPIC_CLASSIFY_SYSTEM_PROMPT = """
 TEMPLATE_TYPE_EXTRACT_PROMPT = """
 다음은 고객 메시지 템플릿 유형 목록이야.
 - 생일/기념일
-- 구매 후 안내
+- 구매 후 안내 (출고 완료, 배송 시작, 배송 안내 등 포함)
 - 재구매 유도
-- 고객 맞춤 메시지 
+- 고객 맞춤 메시지 (VIP, 가입 고객 등 포함)
 - 리뷰 요청
 - 설문 요청
 - 이벤트 안내
@@ -81,7 +81,7 @@ def classify_topics(user_input: str) -> list:
     return [result.strip()] if result.strip() in PROMPT_META else []
 
 # 에이전트 프롬프트 구성 함수
-def build_agent_prompt(topics: list, persona: str):  # 수정: user_input 매개변수 제거
+def build_agent_prompt(topics: list, persona: str):  
     merged_prompts = []
     for topic in topics:
         file_name = PROMPT_META[topic]["file"]  # 파일명만 사용
@@ -138,15 +138,41 @@ def extract_template_type(user_input: str) -> str:
     chain = prompt | llm | StrOutputParser()
     return chain.invoke({"input": user_input}).strip()
 
+def filter_templates_by_query(templates, query):
+    query_lower = query.lower()
+    filtered = []
+    for t in templates:
+        title = t.get('title', '')
+        title_lower = title.lower()
+        # VIP/단골 그룹
+        if ('vip' in query_lower or '단골' in query_lower) and ('vip' in title_lower or '단골' in title_lower):
+            filtered.append(t)
+        # 휴면/장기미구매 그룹
+        elif ('휴면' in query_lower or '장기미구매' in query_lower) and '휴면' in title:
+            filtered.append(t)
+        # 가입, 회원가입 그룹
+        elif ('가입' in query_lower or '회원가입' in query_lower) and ('가입' in title_lower or '회원가입' in title_lower):
+            filtered.append(t)
+        # 최근 구매, 최근구매 그룹
+        elif ('최근 구매' in query_lower or '최근구매' in query_lower) and ('최근 구매' in title_lower or '최근구매' in title_lower):
+            filtered.append(t)
+    return filtered
+
 
 def run_rag_chain(user_input, topics, persona, chat_history):
     prompt = build_agent_prompt(topics, persona)
     base_filter = {"category": "customer_management"}
-    topic_filter = base_filter
-    if topics:
+
+    if topics == ["customer_etc"]:
+        search_kwargs = {"k": 5, "filter": base_filter}
+    elif topics:
         topic_filter = {"$and": [base_filter, {"topic": {"$in": topics}}]}
+        search_kwargs = {"k": 5, "filter": topic_filter}
+    else:
+        search_kwargs = {"k": 5, "filter": base_filter}
+
     retriever = vectorstore.as_retriever(
-        search_kwargs={"k": 5, "filter": topic_filter}
+        search_kwargs=search_kwargs
     )
     document_chain = create_stuff_documents_chain(
         llm=llm,
@@ -173,34 +199,27 @@ def run_customer_agent_with_rag(
     topics = classify_topics(user_input)
     logger.info(f"Classified topics: {topics}")
 
-    # if "customer_message" in topics:
-    #     template_type = extract_template_type(user_input)
-    #     logger.info(f"Extracted template_type: {template_type}")
-    #     templates = get_templates_by_type(template_type)
-    #     if templates:
-    #         answer = "\n\n\n".join([f"제목: {t['title']}\n\n{t['content']}" for t in templates])
-    #         answer += f"\n\n 위와 같은 메시지 템플릿을 활용해보세요."
-    #         sources = ""
-    #     else:
-    #         answer, sources = run_rag_chain(user_input, topics, persona, chat_history)
-    #     return {
-    #         "topics": topics,
-    #         "answer": answer,
-    #         "sources": sources
-    #     }
     if "customer_message" in topics:
         template_type = extract_template_type(user_input)
         logger.info(f"Extracted template_type: {template_type}")
         templates = get_templates_by_type(template_type)
-        if templates:
+
+        if template_type == "고객 맞춤 메시지" and templates:
+            filtered_templates = filter_templates_by_query(templates, user_input)
+        else:
+            filtered_templates = templates
+
+        if filtered_templates:
             answer_blocks = []
-            for t in templates:
+            for t in filtered_templates:
                 if t.get("content_type") == "html":
-                    preview_url = f"/preview/{t['id']}"
+                    preview_url = f"http://localhost:8000/preview/{t['template_id']}"
                     answer_blocks.append(f"제목: {t['title']}\n\n[HTML 미리보기]({preview_url})")
+
                 else:
                     answer_blocks.append(f"제목: {t['title']}\n\n{t['content']}")
-            answer = "\n\n\n".join(answer_blocks)
+            #answer = "\n\n\n".join(answer_blocks)
+            answer = "\n\n---\n\n".join(answer_blocks)
             answer += f"\n\n 위와 같은 메시지 템플릿을 활용해보세요."
             sources = ""
         else:

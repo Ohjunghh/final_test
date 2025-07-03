@@ -164,9 +164,9 @@ def get_template_by_id(template_id: int) -> dict | None:
         with engine.connect() as conn:
             result = conn.execute(
                 text("""
-                    SELECT id, template_type, content_type, title, content
+                    SELECT template_id, template_type, content_type, title, content
                     FROM template_message
-                    WHERE id = :template_id
+                    WHERE template_id = :template_id
                 """),
                 {"template_id": template_id}
             )
