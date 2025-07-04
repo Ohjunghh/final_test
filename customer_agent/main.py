@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from langchain_core.messages import HumanMessage,AIMessage
 from typing import Dict, Any
 from fastapi.responses import HTMLResponse
+import time
+
 # 로거 설정
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -64,6 +66,9 @@ async def health_check():
 @app.post("/agent/query")
 async def query_agent(request: AgentQueryRequest = Body(...)):
     try:
+        # ✅ 전체 처리 시간 측정 시작
+        start_time = time.time()
+
         # 1. 클라이언트에서 history를 받아옴 (DB X)
         history = []
         for msg in request.history:
@@ -116,6 +121,10 @@ async def query_agent(request: AgentQueryRequest = Body(...)):
         )
         if not insert_success:
             logger.warning(f"Failed to insert agent response for conversation {request.conversation_id}")
+
+         # ✅ 처리 시간 측정 종료
+        total_time = round(time.time() - start_time, 2)
+        logger.info(f"[응답 시간] /agent/query 처리에 걸린 시간: {total_time}초")
 
         # 5. 결과 반환 (history도 함께 반환)
         return {

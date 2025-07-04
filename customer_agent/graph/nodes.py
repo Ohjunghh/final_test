@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import re  # 정규식 사용
+import time
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -26,6 +27,8 @@ class InquiryClassification(BaseModel):
     inquiry_type: str = Field(..., enum=["인사", "상담", "잡담"])
 
 def analyze_inquiry_node(state: CustomerAgentState) -> dict:
+    start = time.time()
+
     """문의 분류 노드 (JSON 파서 사용)"""
     # 2. 도메인 특화 프롬프트
     system_prompt = """
@@ -35,7 +38,7 @@ def analyze_inquiry_node(state: CustomerAgentState) -> dict:
     - 인사: 순수 인사/감사 표현 (예: "안녕하세요", "감사합니다")
     - 상담: 사장님의 고객 관리 관련 문의  
       (예: "단골 고객 유지 방법", "고객 불만 해결법", "리뷰 관리 전략","답변 템플릿/메세지 추천")
-    - 잡담: 업무와 무관한 대화 (예: "오늘 날씨 좋네요")
+    - 잡담: 고객 관리와 무관한 대화 (예: "오늘 날씨 좋네요")
     
     **출력 형식:**
     {format_instructions}
@@ -57,7 +60,8 @@ def analyze_inquiry_node(state: CustomerAgentState) -> dict:
     try:
         result = chain.invoke({"input": state["user_input"]})
         inquiry_type = result.get("inquiry_type", "상담")
-        logger.info(f"분류 결과: {inquiry_type}")
+        end = time.time()
+        logger.info(f"분류 결과: {inquiry_type}  (소요 시간: {end - start:.2f}초)")
         return {"inquiry_type": inquiry_type}
     except Exception as e:
         logger.error(f"분류 오류: {str(e)}")
@@ -65,6 +69,7 @@ def analyze_inquiry_node(state: CustomerAgentState) -> dict:
 
 
 def small_talk_node(state: CustomerAgentState) -> dict:
+    start = time.time()
     # 기존 히스토리 로그 찍기 (디버깅용)
     logger.info(f"[SmallTalk 히스토리] { [msg.content for msg in state['history']] }")
     logger.info(f"[SmallTalk 입력] {state['user_input']}")
@@ -77,7 +82,7 @@ def small_talk_node(state: CustomerAgentState) -> dict:
         response = "감사합니다! 더 나은 서비스로 보답하겠습니다."
     else:
         prompt = ChatPromptTemplate.from_template(
-            "사용자의 인사나 잡담에 1-2문장으로 정중한 어투로 답변하세요: {input}"
+            "사용자의 인사나 잡담에 친절하게 1~2문장 정도로 응답하고, 지금은 고객 관리 관련 질문에 대해 도와드릴 수 있다는 점을 자연스럽게 안내해줘: {input}"
         )
         chain = prompt | llm_gemini | StrOutputParser()
         #chain = prompt | llm | StrOutputParser()
@@ -88,12 +93,17 @@ def small_talk_node(state: CustomerAgentState) -> dict:
     new_ai_msg = AIMessage(content=response)
     updated_history = (state["history"] + [new_user_msg, new_ai_msg])[-6:]  # 최근 6개만 유지
 
+    end = time.time()
+    duration = round(end - start, 2)
+    logger.info(f"[⏱ 노드] small_talk_node 실행 시간: {duration}초")
+
     return {
         "answer": response,
         "history": updated_history
     }
 
 def rag_node(state: CustomerAgentState) -> dict:
+    start = time.time()
     logger.info(f"[RAG 히스토리] 대화 ID {state['conversation_id']} 히스토리: {[msg.content for msg in state['history']]}")
     logger.info(f"[RAG 입력] {state['user_input']}")
 
@@ -109,6 +119,10 @@ def rag_node(state: CustomerAgentState) -> dict:
     new_ai_msg = AIMessage(content=result["answer"])
     updated_history = (state["history"] + [new_user_msg, new_ai_msg])[-6:]
 
+    end = time.time()
+    duration = round(end - start, 2)
+    logger.info(f"[⏱ 노드] rag_node 실행 시간: {duration}초")
+    
     return {
         "topics": result["topics"],
         "answer": result["answer"],
